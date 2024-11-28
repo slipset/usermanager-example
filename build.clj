@@ -1,4 +1,22 @@
 (ns build
+  "This is the build script for the usermanager project.
+
+   You can use this command to get a list of (public) functions in build.clj:
+
+     clojure -T:deps:build help/dir
+
+   You can use this command to get documentation for a specific function:
+
+     clojure -T:deps:build help/doc :fn ci
+
+   The :deps alias is provided by the Clojure CLI and provides some useful
+   tooling when working with projects. This will list deps functions:
+
+     clojure -T:deps help/dir
+
+   and this will list the functions available in the help ns (alias):
+
+     clojure -T:deps help/dir :ns help"
   (:refer-clojure :exclude [test])
   (:require [clojure.tools.build.api :as b]))
 
