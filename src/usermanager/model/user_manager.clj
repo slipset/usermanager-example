@@ -10,7 +10,7 @@
 ;; data model access functions
 
 (defn department-by-id [id]
-  ["select * from departement where id = ?" id])
+  ["select * from department where id = ?" id])
 
 (def all-departments ["select * from department order by name"])
 
