@@ -5,7 +5,8 @@
   (:require [clojure.test :refer [deftest is use-fixtures]]
             [com.stuartsierra.component :as component]
             [next.jdbc :as jdbc]
-            [usermanager.model.user-manager :as model]))
+            [usermanager.model.user-manager :as model]
+            [usermanager.db :as db]))
 
 (def ^:private test-db (atom nil))
 
@@ -32,32 +33,36 @@
 
 (deftest department-test
   (is (= #:department{:id 1 :name "Accounting"}
-         (model/get-department-by-id @test-db 1)))
-  (is (= 4 (count (model/get-departments @test-db)))))
+         (db/query-one! (@test-db) (model/department-by-id 1))))
+  (is (= 4 (count (db/query! (@test-db) model/all-departments)))))
 
 (deftest user-test
-  (is (= 1 (:addressbook/id (model/get-user-by-id @test-db 1))))
+  (is (= 1 (:addressbook/id (db/query-one! (@test-db) (model/user-by-id 1)))))
   (is (= "Sean" (:addressbook/first_name
-                 (model/get-user-by-id @test-db 1))))
+                 (db/query-one! (@test-db) (model/user-by-id 1)))))
   (is (= 4 (:addressbook/department_id
-            (model/get-user-by-id @test-db 1))))
-  (is (= 1 (count (model/get-users @test-db))))
+            (db/query-one! (@test-db) (model/user-by-id 1)))))
+  (is (= 1 (count (db/query!  (@test-db) model/all-users))))
   (is (= "Development" (:department/name
-                        (first
-                         (model/get-users @test-db))))))
+                        (db/query-one! (@test-db)
+                                       model/all-users)))))
 
 (deftest save-test
   (is (= "sean@corfield.org"
          (:addressbook/email
           (do
-            (model/save-user @test-db {:addressbook/id 1
-                                       :addressbook/email "sean@corfield.org"})
-            (model/get-user-by-id @test-db 1)))))
+            (db/save! (@test-db)
+                      :addressbook
+                      {:addressbook/id 1
+                       :addressbook/email "sean@corfield.org"})
+            (db/query-one! (@test-db) (model/user-by-id 1))))))
   (is (= "seancorfield@hotmail.com"
          (:addressbook/email
           (do
-            (model/save-user @test-db {:addressbook/first_name "Sean"
-                                       :addressbook/last_name "Corfield"
-                                       :addressbook/department_id 4
-                                       :addressbook/email "seancorfield@hotmail.com"})
-            (model/get-user-by-id @test-db 2))))))
+            (db/save! (@test-db)
+                     :addressbook
+                     {:addressbook/first_name "Sean"
+                      :addressbook/last_name "Corfield"
+                      :addressbook/department_id 4
+                      :addressbook/email "seancorfield@hotmail.com"})
+            (db/query-one! (@test-db) (model/user-by-id 1)))))))

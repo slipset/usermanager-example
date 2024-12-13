@@ -4,11 +4,15 @@
   "The main controller for the user management portion of this app."
   (:require [ring.util.response :as resp]
             [selmer.parser :as tmpl]
-            [usermanager.model.user-manager :as model]))
+            [usermanager.model.user-manager :as model]
+            [usermanager.db :as db]))
 
 (def ^:private changes
   "Count the number of changes (since the last reload)."
   (atom 0))
+
+(defn ->db [req]
+  ((-> req :application/component :database)))
 
 (defn render-page
   "Each handler function here adds :application/view to the request
@@ -38,8 +42,8 @@
   "Compojure has already coerced the :id parameter to an int."
   [req]
   (swap! changes inc)
-  (model/delete-user-by-id (-> req :application/component :database)
-                           (get-in req [:params :id]))
+  (db/delete! (->db req) (model/delete-by-id
+                          (get-in req [:params :id])))
   (resp/redirect "/user/list"))
 
 (defn edit
@@ -49,19 +53,20 @@
   int and we can use it to populate the edit form by loading that user's
   data from the addressbook."
   [req]
-  (let [db   (-> req :application/component :database)
+  (let [db   (->db req)
         user (when-let [id (get-in req [:params :id])]
-               (model/get-user-by-id db id))]
+               (db/query-one! db (model/user-by-id id)))
+        departments (db/query! db model/all-departments)]
     (-> req
         (update :params assoc
                 :user user
-                :departments (model/get-departments db))
+                :departments departments)
         (assoc :application/view "form"))))
 
 (defn get-users
   "Render the list view with all the users in the addressbook."
   [req]
-  (let [users (model/get-users (-> req :application/component :database))]
+  (let [users (db/query! (->db req) model/all-users)]
     (-> req
         (assoc-in [:params :users] users)
         (assoc :application/view "list"))))
@@ -80,8 +85,8 @@
       (update :id            #(some-> % not-empty Long/parseLong))
       (update :department_id #(some-> % not-empty Long/parseLong))
       ;; qualify their names for domain model:
-      (->> (reduce-kv (fn [m k v] (assoc! m (keyword "addressbook" (name k)) v))
+      (->> (reduce-kv (fn [m k v] (assoc! m (db/->kw :addressbook k) v))
                       (transient {}))
            (persistent!)
-           (model/save-user (-> req :application/component :database))))
+           (db/save! (->db req) :addressbook)))
   (resp/redirect "/user/list"))

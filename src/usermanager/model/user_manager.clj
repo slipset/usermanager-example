@@ -92,52 +92,19 @@ create table addressbook (
 
 ;; data model access functions
 
-(defn get-department-by-id
-  "Given a department ID, return the department record."
-  [db id]
-  (sql/get-by-id (db) :department id))
+(defn department-by-id [id]
+  ["select * from departement where id = ?" id])
 
-(defn get-departments
-  "Return all available department records (in order)."
-  [db]
-  (sql/query (db) ["select * from department order by name"]))
+(def all-departments ["select * from department order by name"])
 
-(defn get-user-by-id
-  "Given a user ID, return the user record."
-  [db id]
-  (sql/get-by-id (db) :addressbook id))
+(defn user-by-id [id]
+  ["select * from addressbook where id = ?" id])
 
-(defn get-users
-  "Return all available users, sorted by name.
-
-  Since this is a join, the keys in the hash maps returned will
-  be namespace-qualified by the table from which they are drawn:
-
-  addressbook/id, addressbook/first_name, etc, department/name"
-  [db]
-  (sql/query (db)
-             ["
+(def all-users ["
 select a.*, d.name
  from addressbook a
  join department d on a.department_id = d.id
  order by a.last_name, a.first_name
-"]))
-
-(defn save-user
-  "Save a user record. If ID is present and not zero, then
-  this is an update operation, otherwise it's an insert."
-  [db user]
-  (let [id (:addressbook/id user)]
-    (if (and id (not (zero? id)))
-      ;; update
-      (sql/update! (db) :addressbook
-                   (dissoc user :addressbook/id)
-                   {:id id})
-      ;; insert
-      (sql/insert! (db) :addressbook
-                   (dissoc user :addressbook/id)))))
-
-(defn delete-user-by-id
-  "Given a user ID, delete that user."
-  [db id]
-  (sql/delete! (db) :addressbook {:id id}))
+"])
+(defn delete-by-id [id]
+  ["delete from addressbook where id = ?" id]) 
