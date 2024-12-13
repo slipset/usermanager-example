@@ -2,7 +2,7 @@
 
 (ns usermanager.main
   "This is an example web application, using just a few basic Clojure
-  libraries: Ring, Compojure, Component, Selmer, and next.jdbc.
+  libraries: Ring, Compojure, Selmer, and next.jdbc.
 
   I recommend this as a good way to get started building web applications
   in Clojure so that you understand the basic moving parts in any web app.
@@ -46,10 +46,6 @@
     (-> (resp/response (tmpl/render-file "layouts/default.html"
                                          (assoc data :body [:safe html])))
         (resp/content-type "text/html"))))
-
-(defn ->db [req]
-  (-> req :application/db))
-
 
 (defn- ->id [uri]
   (-> uri (str/split #"/") last Long/parseLong))
@@ -119,20 +115,9 @@
                                          ;; support load balancers
                                        (assoc-in [:proxy] true)))))
 
-(defn web-server
-  "Return a WebServer component that depends on the application.
-
-  The handler-fn is a function that accepts the application (Component) and
-  returns a fully configured Ring handler (with middeware)."
-  [handler-fn port]
-  (run-jetty handler-fn
-             {:port port :join? false}))
-
 (def ^:private my-db
   "SQLite database connection spec."
   {:dbtype "sqlite" :dbname "usermanager_db"})
-
-(defn setup-database [db-spec] (jdbc/get-datasource db-spec))
 
 (defn new-system
   "Build a default system to run. In the REPL:
@@ -143,9 +128,9 @@
 
   See the Rich Comment Form below."
   [port]
-  (let [db (setup-database my-db)]
+  (let [db (jdbc/get-datasource my-db)]
     {:db db
-     :web-server (web-server (middleware-stack db) port)}))
+     :web-server (run-jetty (middleware-stack db) {:port port :join? false})}))
 
 (defn stop [system]
   (.stop (:web-server system)))
