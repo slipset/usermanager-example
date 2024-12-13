@@ -12,7 +12,7 @@
   (atom 0))
 
 (defn ->db [req]
-  ((-> req :application/component :database)))
+  (-> req :application/db))
 
 (defn render-page
   "Each handler function here adds :application/view to the request

@@ -28,44 +28,16 @@
   complexity that is Java's JDBC class hierarchy.
 
   This example uses a local SQLite database to store data."
-  (:require [com.stuartsierra.component :as component]
-            [compojure.coercions :refer [as-int]]
+  (:require [compojure.coercions :refer [as-int]]
             [compojure.core :refer [GET POST let-routes]]
             [compojure.route :as route]
             [ring.adapter.jetty :refer [run-jetty]]
             [ring.middleware.defaults :as ring-defaults]
             [ring.util.response :as resp]
             [usermanager.controllers.user :as user-ctl]
-            [usermanager.model.user-manager :as model])
+            [usermanager.migration :as migration]
+            [next.jdbc :as jdbc])
   (:gen-class))
-
-;; Implement your application's lifecycle here:
-;; Although the application config is not used in this simple
-;; case, it probably would be in the general case -- and the
-;; application state here is trivial but could be more complex.
-(defrecord Application [config   ; configuration (unused)
-                        database ; dependency
-                        state]   ; behavior
-  component/Lifecycle
-  (start [this]
-    ;; Component ensures that dependencies are fully initialized and
-    ;; started before invoking this component.
-    (assoc this :state "Running"))
-  (stop  [this]
-    (assoc this :state "Stopped")))
-
-(defn my-application
-  "Return your application component, fully configured.
-
-  In this simple case, we just pass the whole configuration into
-  the application (a hash map containing a :repl flag).
-
-  The application depends on the database (which is created in
-  new-system below and automatically passed into Application by
-  Component itself, before calling start)."
-  [config]
-  (component/using (map->Application {:config config})
-                   [:database]))
 
 (defn my-middleware
   "This middleware runs for every request and can execute before/after logic.
@@ -83,9 +55,9 @@
 (defn- add-app-component
   "Middleware to add your application component into the request. Use
   the same qualified keyword in your controller to retrieve it."
-  [handler application]
+  [handler db]
   (fn [req]
-    (handler (assoc req :application/component application))))
+    (handler (assoc req :application/db db))))
 
 ;; This is Ring-specific, the specific stack of middleware you need for your
 ;; application. This example uses a fairly standard stack of Ring middleware
@@ -93,11 +65,11 @@
 (defn middleware-stack
   "Given the application component and middleware, return a standard stack of
   Ring middleware for a web application."
-  [app-component app-middleware]
+  [db app-middleware]
   (fn [handler]
     (-> handler
         (app-middleware)
-        (add-app-component app-component)
+        (add-app-component db)
         (ring-defaults/wrap-defaults (-> ring-defaults/site-defaults
                                          ;; disable XSRF for now
                                          (assoc-in [:security :anti-forgery] false)
@@ -120,8 +92,8 @@
   Since we need to deal with page rendering after the handler runs,
   and we need to pass in the application component at start up, we
   need to define our route handlers so that they can be parameterized."
-  [application]
-  (let-routes [wrap (middleware-stack application #'my-middleware)]
+  [db]
+  (let-routes [wrap (middleware-stack db #'my-middleware)]
     (GET  "/"                        []              (wrap #'user-ctl/default))
     ;; horrible: application should POST to this URL!
     (GET  "/user/delete/:id{[0-9]+}" [id :<< as-int] (wrap #'user-ctl/delete-by-id))
@@ -139,49 +111,15 @@
 ;; Standard web server component -- knows how to stop and start the
 ;; web server (with the application component as a dependency, and
 ;; the handler function as a parameter):
-(defrecord WebServer [handler-fn port        ; parameters
-                      application            ; dependencies
-                      http-server shutdown]  ; state
-  component/Lifecycle
-  (start [this]
-         ;; it's important for your components to be idempotent: if you start
-         ;; them more than once, only the first call to start should do anything
-         ;; and subsequent calls should be an no-op -- the same applies to the
-         ;; stop calls: only stop the system if it is running, else do nothing
-         (if http-server
-           this
-           (assoc this
-                  ;; start a Jetty web server -- use :join? false
-                  ;; so that it does not block (we use a promise
-                  ;; to block on in -main):
-                  :http-server (run-jetty (handler-fn application)
-                                          {:port port :join? false})
-                  ;; this promise exists primarily so -main can
-                  ;; wait on something, since we start the web
-                  ;; server in a non-blocking way:
-                  :shutdown (promise))))
-  (stop  [this]
-         (if http-server
-           (do
-             ;; shutdown Jetty: call .stop on the server object:
-             (.stop http-server)
-             ;; deliver the promise to indicate shutdown (this is
-             ;; really just good housekeeping, since you're only
-             ;; going to call stop via the REPL when you are not
-             ;; waiting on the promise):
-             (deliver shutdown true)
-             (assoc this :http-server nil))
-           this)))
 
 (defn web-server
   "Return a WebServer component that depends on the application.
 
   The handler-fn is a function that accepts the application (Component) and
   returns a fully configured Ring handler (with middeware)."
-  [handler-fn port]
-  (component/using (map->WebServer {:handler-fn handler-fn
-                                    :port port})
-                   [:application]))
+  [handler-fn db port]
+  (run-jetty (handler-fn db)
+             {:port port :join? false}))
 
 ;; This is the piece that combines the generic web server component above with
 ;; your application-specific component defined at the top of the file, and
@@ -189,6 +127,14 @@
 ;; Note that a Var is used -- the #' notation -- instead of a bare symbol
 ;; to make REPL-driven development easier. See the following for details:
 ;; https://clojure.org/guides/repl/enhancing_your_repl_workflow#writing-repl-friendly-programs
+
+
+(def ^:private my-db
+  "SQLite database connection spec."
+  {:dbtype "sqlite" :dbname "usermanager_db"})
+
+(defn setup-database [db-spec] (jdbc/get-datasource db-spec))
+
 (defn new-system
   "Build a default system to run. In the REPL:
 
@@ -199,16 +145,17 @@
   (alter-var-root #'system component/stop)
 
   See the Rich Comment Form below."
-  ([port] (new-system port true))
-  ([port repl]
-   (component/system-map :application (my-application {:repl repl})
-                         :database    (model/setup-database)
-                         :web-server  (web-server #'my-handler port))))
+  [port]
+  (let [db (setup-database my-db)]
+    {:db db
+     :web-server (web-server #'my-handler db port)}))
+
+(defn stop [system]
+  (.stop (:web-server system)))
 
 (comment
   (def system (new-system 8888))
-  (alter-var-root #'system component/start)
-  (alter-var-root #'system component/stop)
+  (stop system)
   )
 
 (defonce ^:private
@@ -239,9 +186,8 @@
         port (cond-> port (string? port) Integer/parseInt)]
     (println "Starting up on port" port)
     ;; start the web server and application:
-    (-> (component/start (new-system port false))
+    (-> (new-system port )
         ;; then put it into the atom so we can get at it from a REPL
         ;; connected to this application:
-        (->> (reset! repl-system))
-        ;; then wait "forever" on the promise created:
-        :web-server :shutdown deref)))
+        (->> (reset! repl-system)))
+    (migration/populate (:db @repl-system) "sql-lite")))
