@@ -22,13 +22,13 @@
                         " (start with 1 increment by 1)"
                         " primary key"))]
     (try
-      (jdbc/execute-one! (db)
+      (jdbc/execute-one! db
                          [(str "
 create table department (
   id            integer " auto-key ",
   name          varchar(32)
 )")])
-      (jdbc/execute-one! (db)
+      (jdbc/execute-one! db
                          [(str "
 create table addressbook (
   id            integer " auto-key ",
@@ -42,9 +42,9 @@ create table addressbook (
       ;; so populate it...
       (try
         (doseq [d departments]
-          (sql/insert! (db) :department {:name d}))
+          (sql/insert! db :department {:name d}))
         (doseq [row initial-user-data]
-          (sql/insert! (db) :addressbook row))
+          (sql/insert! db :addressbook row))
         (println "Populated database with initial data!")
         (catch Exception e
           (println "Exception:" (ex-message e))

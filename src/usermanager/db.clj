@@ -1,15 +1,19 @@
 (ns usermanager.db
   (:require [next.jdbc :as jdbc]
-            [next.jdbc.sql :as sql]))
+            [next.jdbc.sql :as sql]
+            [honey.sql :as honey]))
+
+(defn ->sql [honey]
+  (honey/format honey))
 
 (defn query! [db q]
-  (sql/query db q))
+  (jdbc/execute! db (->sql q)))
 
 (defn query-one! [db q]
-  (first (query! db q)))
+    (jdbc/execute-one! db (->sql q)))
 
 (defn delete! [db q]
-  (jdbc/execute! db q))
+  (jdbc/execute! db (->sql q)))
 
 (defn ->kw [ns kw]
   (keyword (name ns) (name kw)))

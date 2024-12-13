@@ -3,26 +3,38 @@
 (ns usermanager.model.user-manager
   "The model for the application. This is where the persistence happens,
   although in a larger application, this would probably contain just the
-  business logic and the persistence would be in a separate namespace.")
+  business logic and the persistence would be in a separate namespace."
+  (:require [honey.sql.helpers :as hh]))
 
 ;; our database connection and initial data
 
 ;; data model access functions
 
-(defn department-by-id [id]
-  ["select * from department where id = ?" id])
+(defn by-id [id]
+  [:= :id id])
 
-(def all-departments ["select * from department order by name"])
+(defn department-by-id [id]
+  (-> (hh/select :*)
+      (hh/from :department)
+      (hh/where (by-id [id]))))
+
+(def all-departments
+  (-> (hh/select :*)
+      (hh/from :department)
+      (hh/order-by :name)))
 
 (defn user-by-id [id]
-  ["select * from addressbook where id = ?" id])
+  (-> (hh/select :*)
+      (hh/from :addressbook)
+      (hh/where (by-id id))))
 
-(def all-users ["
-select a.*, d.name
- from addressbook a
- join department d on a.department_id = d.id
- order by a.last_name, a.first_name
-"])
+(def all-users
+  (-> (hh/select :a.*, :d.name)
+      (hh/from [:addressbook :a])
+      (hh/join [:department :d] [:= :a.department_id :d.id])
+      (hh/order-by :a.last_name :a.first_name)))
 
 (defn delete-by-id [id]
-  ["delete from addressbook where id = ?" id]) 
+  (-> (hh/delete)
+      (hh/from :addressbook)
+      (hh/where (by-id id)))) 
