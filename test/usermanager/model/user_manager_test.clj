@@ -51,18 +51,17 @@
   (is (= "sean@corfield.org"
          (:addressbook/email
           (do
-            (db/save! @test-db
-                      :addressbook
-                      {:addressbook/id 1
-                       :addressbook/email "sean@corfield.org"})
+            (db/transact! @test-db
+                          (model/update-user {:addressbook/id 1
+                                              :addressbook/email "sean@corfield.org"}))
             (db/query-one! @test-db (model/user-by-id 1))))))
   (is (= "seancorfield@hotmail.com"
          (:addressbook/email
           (do
-            (db/save! @test-db
-                     :addressbook
-                     {:addressbook/first_name "Sean"
-                      :addressbook/last_name "Corfield"
-                      :addressbook/department_id 4
-                      :addressbook/email "seancorfield@hotmail.com"})
+            (db/transact! @test-db
+                          (model/create-user
+                           {:addressbook/first_name "Sean"
+                            :addressbook/last_name "Corfield"
+                            :addressbook/department_id 4
+                            :addressbook/email "seancorfield@hotmail.com"}))
             (db/query-one! @test-db (model/user-by-id 2)))))))

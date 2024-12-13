@@ -22,7 +22,7 @@
   "Compojure has already coerced the :id parameter to an int."
   [db id]
   (swap! changes inc)
-  (db/delete! db (model/delete-by-id id)))
+  (db/transact! db (model/delete-by-id id)))
 
 (defn edit
   "Display the add/edit form.
@@ -31,24 +31,18 @@
   int and we can use it to populate the edit form by loading that user's
   data from the addressbook."
   [db id]
-  (let [user (when id
-               (db/query-one! db (model/user-by-id id)))
-        departments (db/query! db model/all-departments)]
-    {:user user
-     :departments departments}))
+  {:user (some->> id model/user-by-id (db/query-one! db))
+   :departments (db/query! db model/all-departments)})
 
 (defn get-users
   "Render the list view with all the users in the addressbook."
   [db]
-  (let [users (db/query! db model/all-users)]
-    {:users users}))
+  {:users (db/query! db model/all-users)})
 
-(defn save
-  "This works for saving new users as well as updating existing users, by
-  delegatin to the model, and either passing nil for :addressbook/id or
-  the numeric value that was passed to the edit form."
-  [db user]
-  (swap! changes inc)
+(defn ->kw [ns kw]
+  (keyword (name ns) (name kw)))
+
+(defn- prepare [user]
   (-> user
       ;; get just the form fields we care about:
       (select-keys [:id :first_name :last_name :email :department_id])
@@ -56,7 +50,16 @@
       (update :id            #(some-> % not-empty Long/parseLong))
       (update :department_id #(some-> % not-empty Long/parseLong))
       ;; qualify their names for domain model:
-      (->> (reduce-kv (fn [m k v] (assoc! m (db/->kw :addressbook k) v))
+      (->> (reduce-kv (fn [m k v] (assoc! m (->kw :addressbook k) v))
                       (transient {}))
-           (persistent!)
-           (db/save! db :addressbook))))
+           (persistent!))))
+
+(defn save
+  "This works for saving new users as well as updating existing users, by
+  delegatin to the model, and either passing nil for :addressbook/id or
+  the numeric value that was passed to the edit form."
+  [db user]
+  (swap! changes inc)
+  (db/transact! db (if (:id user)
+                     (model/update-user (prepare user))
+                     (model/create-user (prepare user)))))

@@ -37,4 +37,13 @@
 (defn delete-by-id [id]
   (-> (hh/delete)
       (hh/from :addressbook)
-      (hh/where (by-id id)))) 
+      (hh/where (by-id id))))
+
+(defn update-user [user]
+  (-> (hh/update :addressbook)
+      (hh/set (dissoc user :addressbook/id))
+      (hh/where (by-id (:addressbook/id user)))))
+
+(defn create-user [user]
+  (-> (hh/insert-into :addressbook)
+      (hh/values [(dissoc user :addressbook/id)])))
