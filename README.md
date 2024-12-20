@@ -1,23 +1,26 @@
 # Example Web Application in Clojure
 
-This is a simple web application using [Component](https://github.com/stuartsierra/component), [Ring](https://github.com/ring-clojure/ring), [Compojure](https://github.com/weavejester/compojure), and [Selmer](https://github.com/yogthos/Selmer) connected to a local SQLite database.
+This is a paraphrasing of Sean Corfields [usermanager-example](https://github.com/seancorfield/usermanager-example) application.
+This version of it explores a couple of themes
+- I'm not a huge fan of [Component](https://github.com/stuartsierra/component)/[Integrant](https://github.com/weavejester/integrant) et al, so none of that
+- Routers are really very simple things at the core. This is a very simple app, so no router, just a `cond`
+- I find middlewares confusing, so I don't like middleware stacks, so the use of middlewares is reduced
 
-Clojure beginners often ask for a "complete" example that they can look at to see how these common libraries fit together and for a long time I pointed them at the User Manager example in the Framework One for Clojure repo -- but since I EOL'd that framework and I'd already rewritten the example app to no longer use the framework, it's just confusing to point them there, so this is a self-contained repo containing just that web app example.
+## Making queries first class
 
-A variant using [Integrant](https://github.com/weavejester/integrant) and [Reitit](https://github.com/metosin/reitit) (instead of Component and Compojure), inspired by this example repo, can be found in [Michaël Salihi's repo](https://github.com/PrestanceDesign/usermanager-reitit-integrant-example).
+Perhaps most importantly, I find the most important bits of code in a crud-ish app like this one
+are the queries. Therefore, they've been lifted up to top level.
 
-A version of this application that uses the [Polylith architecture](https://polylith.gitbook.io/) is also available, on the [`polylith` branch](https://github.com/seancorfield/usermanager-example/tree/polylith).
+## Do we really need a web frame work
 
-A version of this application that uses the [XTDB 2 database](https://xtdb.com/) instead of SQLite/H2 is also available, on the [`xtdb` branch](https://github.com/seancorfield/usermanager-example/tree/xtdb).
+I think this app also serves as an example of all the choices you don't have to make up front.
+- It's easy to add a routing lib later if you find you need it
+- Want more middlewares - add them
+- Need a [Component](https://github.com/stuartsierra/component) like thing, retrofit it.
 
-Aditya Athalye has created a stripped version, using core functions and helper functions instead of several libraries that this version uses: [usermanager-example from first principles](https://github.com/adityaathalye/usermanager-first-principles). Comparing that version and this version is a good exercise in understanding the basic machinery that a web app needs, and what those libraries are doing for you.
-
-## Quickstart via Devcontainers or Github Codespaces
-If you have configured your Github account, you can start the project without any other setup.  It will open a web-based vscode editor backed by a Github Codespace VM. (Codespaces is Github's hosted Devcontainer solution)
-
-[![Open in Github Codespaces](https://github.com/codespaces/badge.svg)](https://codespaces.new/seancorfield/usermanager-example)
-
-You can also clone this repo locally, and using vscode (with the devcontainer plugin), and Docker Desktop, run an isolated, fully setup version of this application locally. Open the repo in your editor and run the command `Dev Containers: Open Folder in Container...`.
+Basically Clojure, powerful as it is, let's you write the essential code of a webapp without having to 
+start out by choosing a web-framework, you just pick a set of libaries, and it's not really that important
+if you choose lib x or lib y
 
 ## Requirements
 
@@ -57,7 +60,6 @@ Once REPL starts, start the server as an example on port 8888:
 user=> (require 'usermanager.main)                             ; load the code
 user=> (in-ns 'usermanager.main)                               ; move to the namespace
 usermanager.main=> (def system (new-system 8888))              ; specify port
-usermanager.main=> (alter-var-root #'system component/start)   ; start the server
 ```
 
 ### Run the tests with:
