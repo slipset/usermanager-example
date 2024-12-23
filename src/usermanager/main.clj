@@ -34,17 +34,15 @@
             [ring.util.response :as resp]
             [usermanager.controllers.user :as user-ctl]
             [usermanager.migration :as migration]
+            [usermanager.hiccup :as hiccup]
             [next.jdbc :as jdbc]
-            [selmer.parser :as tmpl]
             [clojure.string :as str])
   (:gen-class))
 
 (defn render-page
   [data view]
-  (let [data (assoc data :changes @user-ctl/changes)
-        html (tmpl/render-file (str "views/user/" view ".html") data)]
-    (-> (resp/response (tmpl/render-file "layouts/default.html"
-                                         (assoc data :body [:safe html])))
+  (let [data (assoc data :changes @user-ctl/changes)]
+    (-> (resp/response (hiccup/html data view))
         (resp/content-type "text/html"))))
 
 (defn- ->id [uri]
